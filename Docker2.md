@@ -352,7 +352,7 @@ docker
 
   
 
-- docker-compose.yml 파일을 만들자
+- docker-compose.yml 파일을 만들자   // 경로는 C:\Users\HPE\docker\day03\swarm
 
   ```
   version: "3"
@@ -444,7 +444,7 @@ docker
   docker exec -it worker03 토큰~
   ```
 
-- manager 로 들어가서 ps 해보면 다 연결 된걸 알 수 있음
+- manager 로 들어가서 ps 해보면 다 연결 된 걸 알 수 있음
 
 
 
@@ -495,7 +495,7 @@ docker
   docker pull registry:5000/example/echo
   ```
 
-- 레플리카 1개를 생성해 보자
+- 레플리카 1개를 생성해 보자  //manager 쉘에서
 
   ```
   docker service create --replicas 1 --publish 80:8080 --name echo <-한줄-> registry:5000/example/echo:latest
@@ -505,19 +505,23 @@ docker
 
   http://localhost:8000/ 들어가서 잘 됐는지 확인해보자
 
-  윈도우-웹브라우즈저      도커-매니저  	 매니저-에코	
+  
 
-  ​		8000                   ->  		 	 80        -> 		     8080
+  - 전체 구조 
+
+  | 윈도우-웹브라우즈저       | 도커-매니저                | 매니저-에코 |
+  | ------------------------- | -------------------------- | ----------- |
+  | 8000                   -> | 80                      -> | 8080        |
 
   
 
-- 레플리카 3개로 만들거면
+- 레플리카 3개로 만들거면  //manager 쉘에서
 
   ```
   docker service scale echo=3
   ```
 
-- docker service ps echo 로 내용을 확인해보자
+- docker service ps echo 로 내용을 확인해보자  //manager 쉘에서
 
 ```
 ID                  NAME                IMAGE                               NODE                DESIRED STATE       CURRENT STATE            ERROR               PORTS
@@ -590,13 +594,13 @@ networks:
 
 
 
-- 실행
+- 실행  //manager 쉘에서  cd /stack 하고서 실행하자
 
   ```
   docker stack deploy -c /stack/my-webapi.yml echo
   ```
 
-- 배포된 스택 확인
+- 배포된 스택 확인  //manager 쉘에서
 
   ```
   docker stack services echo
@@ -621,5 +625,106 @@ networks:
               constraints: [node.role == manager] 
   ```
 
+- deploy 실행     //  manager sh에서 cd /stack 하고서 실행하자
+
+  ```
+  docker stack deploy -c /stack/visualizer.yml visualizer
+  ```
+
+- 서비스 목록 확인해서 잘 됐는지 보자  //manager 쉘에서ㅊㅇ 
+
+  ```
+  /stack # docker service ls
+  ID                  NAME                MODE                REPLICAS            IMAGE                               PORTS
+  cja54rtgccou        echo_api            replicated          3/3                 registry:5000/example/echo:latest
+  n3e1m02ve4xy        echo_nginx          replicated          3/3                 gihyodocker/nginx-proxy:latest
+  ruv83xyq8s90        visualizer_app      global              1/1                 dockersamples/visualizer:latest     *:9000->8080/tcp
   
+  
+  ```
+
+- 잘 된 거 같으니 http://localhost:9000/ 들어가서 확인해보자
+
+
+
+
+
+## 스웜 클러스터 외부에서 서비스 사용하기 
+
+- my-ingress.yml 추가해주자    // 경로 C:\Users\HPE\docker\day03\swarm\stack
+
+```
+version: "3"
+services:
+    haproxy:
+        image: dockercloud/haproxy
+        networks:
+            - ch03
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        deploy:
+            mode: global
+            placement:
+                constraints: [node.role == manager]
+        ports:
+            - 80:80
+            - 1936:1936 # for stats page (basic auth. stats:stats)
+networks:
+    ch03:
+        external: true
+```
+
+
+
+- 기존의 my-webapi.yml 들가서 수정 =>포트 80 추가
+
+```
+version: "3"
+services:
+    api:
+        image: registry:5000/example/echo:latest
+        deploy:
+            replicas: 3
+            placement:
+                constraints: [node.role != manager]
+        networks:
+            - ch03
+    nginx:
+        image: gihyodocker/nginx-proxy:latest
+        depends_on:
+            - api
+        deploy:
+            replicas: 3
+            placement:
+                constraints: [node.role !=manager]
+        environment:
+            SERVICE_PORTS: 80     <===== 한줄 추가
+            BACKEND_HOST: echo_api:8080
+        networks:
+            - ch03
+        
+networks:
+    ch03:
+        external: true
+```
+
+
+
+- 실행  //  manager sh에서 cd /stack 하고서 실행하자
+
+  ```
+  docker stack deploy -c /stack/my-webapi.yml echo   // SERVICE_PORTS: 80 추가 했으니 업데이트 해주자
+  docker stack deploy -c /stack/my-ingress.yml ingress
+  ```
+
+- /stack # docker service ls 로 확인하고  로컬 호스트 들어가서 잘 동작하는지 봐주자
+  - http://localhost:9000/
+  - http://localhost:8000/
+- 전체 구조
+
+| windows               | Manager                   | HAProxy                   | nginx |
+| --------------------- | ------------------------- | ------------------------- | ----- |
+| 8000              --> | 80                    --> | 80                    --> | 8080  |
+
+
 
