@@ -448,36 +448,178 @@ docker
 
 
 
+## Docker Service
+
+- 애플리케이션을 구성하는 일부 컨테이너를 제어하기 위한 단위
 
 
 
+- 컴포즈업하자
+
+  ```
+  docker-compose up
+  ```
+
+- manager를 swarm init 하자
+
+  ```
+  docker exec -it manager docker swarm init
+  ```
+
+  - swarm init 하고 나온 토큰으로 나머지 worker1 2 3 들 등록하자
+
+  ```
+  docker exec -it worker01 토큰~
+  docker exec -it worker02 토큰~
+  docker exec -it worker03 토큰~
+  ```
+
+- 
 
 - 도커 레지스트리용 이미지 생성
 
   ```
-  docker tag gihyodocker/echo:latest localhost:5000/gihyodocker/echo:latest
+  docker tag gihyodocker/echo:latest localhost:5000/example/echo:latest
   ```
 
 - 도커 레지스트리에 이미지 등록
 
   ```
-  docker push localhost:5000/gihyodocker/echo
+  docker push localhost:5000/example/echo
   ```
 
   - manager 컨테이너에 이미지 설치
 
   ```
   docker exec -it manager sh
-  docker pull registry:5000/gihyodocker/echo
+  docker pull registry:5000/example/echo
+  ```
+
+- 레플리카 1개를 생성해 보자
+
+  ```
+  docker service create --replicas 1 --publish 80:8080 --name echo <-한줄-> registry:5000/example/echo:latest
+  ```
+
+  위 결과를 보면 포트는 이렇게 연결되어 있다고 볼 수 있다
+
+  http://localhost:8000/ 들어가서 잘 됐는지 확인해보자
+
+  윈도우-웹브라우즈저      도커-매니저  	 매니저-에코	
+
+  ​		8000                   ->  		 	 80        -> 		     8080
+
+  
+
+- 레플리카 3개로 만들거면
+
+  ```
+  docker service scale echo=3
+  ```
+
+- docker service ps echo 로 내용을 확인해보자
+
+```
+ID                  NAME                IMAGE                               NODE                DESIRED STATE       CURRENT STATE            ERROR               PORTS
+9w0iuh64g5o4        echo.1              registry:5000/example/echo:latest   0849fa38ab83        Running             Running 27 minutes ago
+uh4ab03tz7dv        echo.2              registry:5000/example/echo:latest   8366e5dc6db5        Running             Running 12 seconds ago
+56lyjv0idvi6        echo.3              registry:5000/example/echo:latest   dee30a4d8ca5        Running             Running 12 seconds ago
+```
+
+위의 결과를 보면 manager에 등록시킨 woker1,2,3 노드들이 레플된 것을 확인 할 수 있다
+
+로드밸런싱 같은 경우로 사용한다고 볼 수 있나?
+
+
+
+## Docker stack
+
+- 하나 이상의 서비스를 그룹으로 묶은 단위, 애플리케이션 전체 구성 정의
+  - 서비스는 애플리케이션 이미지를 하나 밖에 다루지 못함
+- 여러 서비스를 함께 다룰 수 있음
+- 스택을 사용해 배포된 서비스 그룹은 overlay 네트워크에 속함
+
+
+
+- 
+
+```
+ docker exec -it manager sh
+ docker network create --driver=overlay --attachable ch03
+ docker network ls   //ch03 확인가능
+```
+
+
+
+
+
+## ????
+
+
+
+- my-webapi.yml     경로 : C:\Users\HPE\docker\day03\swarm\stack
+
+```powershell
+version: "3"
+services:
+    api:
+        image: registry:5000/example/echo:latest
+        deploy:
+            replicas: 3
+            placement:
+                constraints: [node.role != manager]
+        networks:
+            - ch03
+    nginx:
+        image: gihyodocker/nginx-proxy:latest
+        depends_on:
+            - api
+        deploy:
+            replicas: 3
+            placement:
+                constraints: [node.role !=manager]
+        environment:
+            BACKEND_HOST: echo_api:8080
+        networks:
+            - ch03
+        
+networks:
+    ch03:
+        external: true
+```
+
+
+
+- 실행
+
+  ```
+  docker stack deploy -c /stack/my-webapi.yml echo
+  ```
+
+- 배포된 스택 확인
+
+  ```
+  docker stack services echo
   ```
 
   
 
+- visualizer.yml를 사용해 컨테이너 배치 시각화하기       경로:\Users\HPE\docker\day03\swarm\stack
 
+  ```
+  version: "3"
+  services:
+     app:
+      image: dockersamples/visualizer
+      ports:
+          - "9000:8080"
+      volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+      deploy:
+          mode: global
+          placement:
+              constraints: [node.role == manager] 
+  ```
 
-
-
-
-
-
+  
 
