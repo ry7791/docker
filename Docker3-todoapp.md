@@ -76,7 +76,7 @@ docker exec -it manager sh
 docker network create --driver=overlay --attachable todoapp
 ```
 
-5. //manager  쉘에서
+5. //manager  쉘에서ㅇ
 
 ```
  docker stack deploy -c /stack/todo-mysql.yml todo_mysql
@@ -99,7 +99,7 @@ docker service ps todo_mysql_master
 - 다 됐으면 worker01 02 03 들어가서 각각의 ip 확인
 
   ```
-  docker exec -it worker03 shㄴ
+  docker exec -it worker03 sh
   hostname -i
   docker ps 
   docker exec -it 21996b105865 hostname -i      
@@ -129,7 +129,65 @@ docker service ps todo_mysql_master --no-trunc `
 
 - 마스터랑 슬레이브 둘 다 들어가서 show slave status\G 로 연동 됐는지 확인해보자
 
-  
 
-  
 
+
+
+
+복습
+
+docker ps 로 worker01 02 03 manager register 있는지 확인
+
+docker exec -it manager sh 들어감
+
+docker service ls
+
+docker stack services todo_mysql  이걸로 마스터 슬레이브 이름 확인 가능
+
+docker service ps todo_mysql_master
+
+
+
+마스터가 worker03 sh 이면
+
+docker exec -it worker03 sh
+
+docker ps 
+
+docker exec -it 이름  sh
+
+mysql -uroot -p 
+
+
+
+
+
+```
+$ docker-compose up 
+$ docker ps (registry, manager, worker01, worker02, worker03)
+$ docker exec -it manager sh
+	(M) $ docker swarm init  (-> join token 생성 됨)
+$ docker exec -it worker01 sh  (worker02, worker03에서도 실행)
+	(W1) $ docker swarm join (with join token) 
+$ docker exec -t manager sh	
+	(M) $ docker node ls (worker01~worker03, manager 확인)
+	(M)	$ docker network create --driver=overlay --attachable todoapp
+	(M) $ docker stack deploy -c /stack/visualizer.yml visualizer
+	(M) $ docker stack deploy -c /stack/todo-mysql.yml todo_mysql
+$ docker exec -t worker01 (or worker02, worker03) sh -> MASTER DB 접속
+	ex, W1) $ docker exec -it [MASTER DB Container] bash
+	ex, W1, Master Container) $ init-data.sh 
+	ex, W1, Master Container) $ mysql -uroot -p tododb
+	ex, W1, Master Container) mysql> select * from todo;
+$ docker push localhost:5000/ch04/todoapi:latest 	
+```
+
+
+
+- 포트번호 확인
+
+apt-get update
+
+apt-get install -y net-tools
+
+netstat-ntpl 
